@@ -11,6 +11,7 @@ hosts.allow format.
 
 __author__ = "nosmo@nosmo.me"
 
+import os
 
 class TCPWrapperHostsFile(object):
     """Interface to tcpwrappers hosts.* files"""
@@ -36,17 +37,18 @@ class TCPWrapperHostsFile(object):
     def __load_data(self):
         """Load data from the hosts file"""
         linedata = []
-        with open(self.filepath, "r") as fileobj:
-            for line in fileobj.read().split("\n"):
-                if line.startswith("#"):
-                    continue
+        if os.path.exists(self.filepath):
+            with open(self.filepath, "r") as fileobj:
+                for line in fileobj.read().split("\n"):
+                    if line.startswith("#"):
+                        continue
 
-                linesplit = line.split()
-                if len(linesplit) == 2:
-                    # No comment
-                    linesplit.append(None)
-                if linesplit:
-                    linedata.append(linesplit)
+                    linesplit = line.split()
+                    if len(linesplit) == 2:
+                        # No comment
+                        linesplit.append(None)
+                    if linesplit:
+                        linedata.append(linesplit)
         return linedata
 
     @staticmethod
@@ -66,61 +68,15 @@ class TCPWrapperHostsFile(object):
             )
 
     def add(self, ipaddress, bantype="ALL", comment=None):
-        """Add to a hosts file.
+        """Add an IP address to the hosts file with optional service
+        and comment.
 
-        Arguments:
-         ipaddress -- ip address tring
-        Keyword arguments:
-         bantype -- the service used to classify the ban. Defaults to ALL.
-         comment -- the comment to append with a #
         """
-
         self.hosts_data = self.__load_data()
+        if comment:
+            comment = "# %s" % comment
+        # TODO check servicetype for validity if it's not ALL
         bantype = "%s:" % bantype
-        lineentry = self.__render_entry([bantype, ipaddress, comment])
-
-        # if entry is the same, do nothing
-        if [bantype, ipaddress, comment] in self.hosts_data:
-            return self
-
-        # if entry exists, update/replace.
-        for index, entry in enumerate(self.hosts_data):
-            if entry[1] == ipaddress:
-                self.hosts_data[index][0] = bantype
-                self.hosts_data[index][2] = comment
-                return self
-
-        if self.buffer_writes:
-            self.buffer.append(lineentry)
-
-        # finally, just add it
-        if not self.buffer_writes:
-            with open(self.filepath, "a") as fileobj:
-                fileobj.write(
-                    "%s\n" % lineentry
-                    )
-        elif self.buffer_writes and len(self.buffer) >= self.buffer_writes:
-            print "Paging out writes"
-            for entry in self.buffer:
-                with open(self.filepath, "a") as fileobj:
-                    fileobj.write(
-                        "%s\n" % entry
-                        )
-
-        self.hosts_data += [bantype, ipaddress, comment]
-
-        # TODO: return something better
-        return self
-
-    def __add__(self, ipaddress):
-        """Add an IP address to the hosts file using ALL: as the type.
-
-        Arguments:
-         ipaddress -- the ipaddress to add.
-        """
-        self.hosts_data = self.__load_data()
-        comment = None
-        bantype = "%s:" % "ALL"
         lineentry = self.__render_entry([bantype, ipaddress, comment])
 
         # finally, just add it
@@ -128,10 +84,19 @@ class TCPWrapperHostsFile(object):
             fileobj.write(
                 "%s\n" % lineentry
             )
-        self.hosts_data = [bantype, ipaddress, comment]
+        self.hosts_data.append([bantype, ipaddress, comment])
 
-        # TODO: return something better
         return self
+
+    def __add__(self, ipaddress):
+
+        """Add an IP address to the hosts file using ALL: as the type.
+
+        Arguments:
+         ipaddress -- the ipaddress to add.
+        """
+
+        return self.add(ipaddress)
 
     def __sub__(self, ipaddress):
         """Remove an IP address from the hosts file
@@ -155,10 +120,12 @@ class TCPWrapperHostsFile(object):
         return self
 
     def __contains__(self, ipaddress):
-        """Check whether an IP address is in the hosts file.
+        """Check whether an IP address is in the hosts file -
+        regardless of protocol.
 
         Arguments:
          ipaddress -- the IP address to look for
+
         """
 
         self.hosts_data = self.__load_data()
