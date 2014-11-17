@@ -25,13 +25,14 @@ And the following:
 tcpf = TCPWrapperHostsFile("/tmp/myfile")
 tcpf += "10.0.0.2"
 tcpf += "10.0.0.3"
+tcpf -= "10.0.0.2"
 ```
 
 Will result in ```/tmp/myfile``` being:
 ```ALL: 10.0.0.3```
 
-All of the aforementioned operations (and some other ones) will
-default to using ALL as the service.
+All of the aforementioned operations (and some others - see
+docstrings) will default to using ALL as the service.
 
 To add records with specific services and to add comments, use the
 ```add``` function.
